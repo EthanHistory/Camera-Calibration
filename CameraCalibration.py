@@ -5,8 +5,8 @@ import radial_distortion as rd
 
 print(sys.executable)
 
-tests = ['calibration', 'homography', 'init_cam_param', 'my_calibration']
-
+# tests = ['calibration', 'homography', 'init_cam_param', 'my_calibration']
+tests = ['my_calibration']
 if __name__ == '__main__':
     pattern_size = (8, 5)
     
@@ -48,6 +48,7 @@ if __name__ == '__main__':
                 
             
         if test == 'my_calibration':
+            my_calibration_object = ca.my_calibration(pattern_size)
             my_calibration_object.load_images('test_images/*.jpg')
             objpoints, imgpoints = my_calibration_object.extract_corners(False)
             my_calibration_object.radial_distortion_test(objpoints, imgpoints)

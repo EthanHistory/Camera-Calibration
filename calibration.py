@@ -298,9 +298,10 @@ class my_calibration(calibration):
         p = np.array([[2.31556927e+01, -2.56866259e+01, -5.11172497e+00,  2.36050153e+01, -1.70086701e+01, -1.64143823e+01]])
         param = rd.params_dict(13, 40, mtx_np, p, rvecs_np, tvecs_np, objpoints_np)
         
-        rdm = rd.radial_distortion()
+        # rdm = rd.radial_distortion()
+        rdm = rd.radial_distortion_test()
         
-        ud_points = rdm.radial_distortion_model(param)
+        distorted_points = rdm.radial_distortion_model(param)
 
         for i, img in enumerate(self._used_images):
             h,  w = img.shape[:2]
@@ -310,8 +311,8 @@ class my_calibration(calibration):
             mapx, mapy = cv.initUndistortRectifyMap(mtx, dist, None, newcameramtx, (w,h), 5)
             dst = img.copy()
 
-            for ud_point in ud_points[i]:
-                dst = cv.circle(dst, (int(ud_point[0]), int(ud_point[1])), 3, (0, 255, 0), -1)
+            for points in distorted_points[i]:
+                dst = cv.circle(dst, (int(points[0]), int(points[1])), 3, (0, 255, 0), -1)
             
             if show:
                 plt.title(f'radial distortion test {i}')
