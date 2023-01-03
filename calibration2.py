@@ -55,7 +55,7 @@ def find_homography(objpoints, imgpoints):
         H = H / H[2][2]
         return H
     
-def DLT_for_B(Hs:list) -> np.ndarray:
+def DLT_for_B(Hs:list, skewless=True) -> np.ndarray:
         '''
         Solve the equation of x, x ~ Hy, by transfroming it into Ax = 0 
         Input
@@ -79,6 +79,10 @@ def DLT_for_B(Hs:list) -> np.ndarray:
             second_row = (np.array(C[1]) - np.array(C[2])).reshape([1, -1])
             A = np.append(A, first_row, axis=0)
             A = np.append(A, second_row, axis=0)
+            
+        # skewless constraint
+        if skewless:
+            A = np.append(A, np.array([0, 1, 0, 0, 0, 0]).reshape([1, -1]), axis=0)
 
         U, S, V = np.linalg.svd(A, full_matrices=False)
         B = V[-1]
@@ -91,9 +95,9 @@ def n_view_homographies(objpoints:List[np.array], imgpoints:List[np.array]):
         Hs.append(find_homography(objpoints[i][:, :2], imgpoints[i]))
     return Hs
 
-def init_camera_matrix(objpoints:List[np.array], imgpoints:List[np.array]) -> np.array :
+def init_camera_matrix(objpoints:List[np.array], imgpoints:List[np.array], skewless) -> np.array :
     Hs = n_view_homographies(objpoints, imgpoints)  
-    B = DLT_for_B(Hs)
+    B = DLT_for_B(Hs, skewless)
 
     # result of Cholesky decomposition
     v0 = (B[1] * B[3] - B[0] * B[4]) / (B[0] * B[2] - B[1] * B[1])
@@ -102,6 +106,9 @@ def init_camera_matrix(objpoints:List[np.array], imgpoints:List[np.array]) -> np
     beta_ = math.sqrt(lambda_ * B[0] / (B[0] * B[2] - B[1] * B[1]))
     gamma_ = -B[1] * alpha_ * alpha_ * beta_ / lambda_
     u0 = gamma_ * v0 / beta_ - B[3] * alpha_ * alpha_ / lambda_
+    
+    if skewless:
+        gamma_ = 0
 
     # print(f'v0 = {v0}')
     # print(f'lambda_ = {lambda_}')
