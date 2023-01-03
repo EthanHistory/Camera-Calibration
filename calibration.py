@@ -72,7 +72,7 @@ class calibration:
             dst = cv.remap(img, mapx, mapy, cv.INTER_LINEAR)
 
             # project point
-            object_points = np.array([(0,0,0), (3,0,0), (0,3,0), (0,0,3)], dtype=np.float)
+            object_points = np.array([(0,0,0), (3,0,0), (0,3,0), (0,0,3)], dtype=float)
             image_points, jac = cv.projectPoints(object_points, rvecs[i], tvecs[i], newcameramtx, np.zeros([1, 14]))
             image_points = np.int32(image_points).reshape(-1,2)
 
