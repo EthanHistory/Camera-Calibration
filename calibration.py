@@ -12,17 +12,19 @@ import scipy.linalg as la
 
 def __normalize(points):
     '''
-    Normalize coordinates of points (centroid to the origin and mean distance of sqrt(2 or 3))
+    Normalize 2d points. 
     
     Input
     -----
+    points: 2d points with shape (n, 2)
     
     Output
     -----
+    normalized_points: normalized points.
+    T: 3d transformation to normalize points.
     
     '''
     
-    # points = np.asfarray(points, dtype=np.float64)
     mean_, std_ = np.mean(points, axis=0), np.std(points, axis=0)
     T = [[std_[0], 0, mean_[0]], [0, std_[1], mean_[1]], [0, 0, 1]]
     T = np.linalg.inv(T)
@@ -32,15 +34,17 @@ def __normalize(points):
 
 def find_homography(objpoints:np.array, imgpoints:np.array):
         '''
-        Solve the equation of x, x ~ Hy, by transfroming it into Ax = 0 
+        By using DLT (direct linear transform),
+        Finding 3x3 matrix describing the relation between 2d points in a plane and 2d points in a image. 
+        
         Input
         -----
-        A: number of dimensions, 3 here
-        x: the data to be normalized (directions at different columns and points at rows)
+        objpoints: 2d points (3d points without z-coordinate).
+        imgpoints: 2d points obtained from a image.
+        
         Output
         ------
-        Tr: the transformation matrix (translation plus scaling)
-        x: the transformed data
+        H: 3x3 homography matrix
         '''
         assert(len(objpoints) == len(imgpoints))
         
@@ -63,15 +67,16 @@ def find_homography(objpoints:np.array, imgpoints:np.array):
     
 def __DLT_for_B(Hs:np.array) -> np.ndarray:
         '''
-        Solve the equation of x, x ~ Hy, by transfroming it into Ax = 0 
+        By using DLT (direct linear transform),
+        Finding B, which composes of K, from a seires of homography matrices.
+        
         Input
         -----
-        A: number of dimensions, 3 here
-        x: the data to be normalized (directions at different columns and points at rows)
+        Hs: numpy array of homography matrices with a shape of (N, 3, 3). N is the number of views, images, or matrices.
+        
         Output
         ------
-        Tr: the transformation matrix (translation plus scaling)
-        x: the transformed data
+        B: 3x3 matrix which composes of K.
         '''
         A = np.empty((0, 6), float)
 
@@ -94,6 +99,15 @@ def __DLT_for_B(Hs:np.array) -> np.ndarray:
         return B
 
 def __init_camera_matrix(Hs:np.array) -> np.array :
+    """
+    Calculate initial camera matrix for calibration
+
+    Args:
+        Hs (np.array): homography matrices with a shape of (N, 3, 3). N is the number of views, images, or matrices.
+
+    Returns:
+        K: 3x3 camera matrix
+    """
     B = __DLT_for_B(Hs)
 
     # result of Cholesky decomposition
@@ -112,6 +126,16 @@ def __init_camera_matrix(Hs:np.array) -> np.array :
     return K
 
 def __init_camera_extrinsics(Hs:np.array) -> np.array :
+    """
+    Calculate initial extrinsic parameters (rotation, translation)
+
+    Args:
+        Hs (np.array): homography matrices with a shape of (N, 3, 3). N is the number of views, images, or matrices.
+
+    Returns:
+        rvecs: rotation vectors transformed by rodrigues with a shape of (N, 3, 1)
+        tvecs: translation vectors with a shape of (N, 3, 1)
+    """
     K = __init_camera_matrix(Hs)
     
     K_inv = np.linalg.inv(K)
@@ -144,6 +168,19 @@ def __init_camera_extrinsics(Hs:np.array) -> np.array :
     return rvecs, tvecs
 
 def parameter_initialization(objpoints:np.array, imgpoints:np.array):
+    """
+    Calculate initial parameters needed for calibration.
+
+    Args:
+        objpoints (np.array): 3d points
+        imgpoints (np.array): 2d points obtained from a image.
+
+    Returns:
+        K: 3x3 camera matrix
+        dist: 5x1 distortion coefficient 
+        rvecs: rotation vectors 
+        tvecs: translation vectors
+    """
     assert(objpoints.shape[0] == imgpoints.shape[0])
     assert(objpoints.shape[2] == 3)
     assert(imgpoints.shape[2] == 2)
@@ -160,6 +197,19 @@ def parameter_initialization(objpoints:np.array, imgpoints:np.array):
     return K, dist, rvecs, tvecs
 
 def __transform_parameters(param_1d, n):
+    """
+    separate 1d parameter to each component.
+
+    Args:
+        param_1d: 1d array of parameters
+        n: number of views or images
+
+    Returns:
+        mtx: 3x3 camera matrix
+        dist: 5x1 distortion coefficient 
+        rvecs: rotation vectors 
+        tvecs: translation vectors
+    """
     dist = np.array([param_1d[0], param_1d[1], 0, 0, 0]).reshape(5, 1)
     mtx = np.array([[param_1d[2], 0, param_1d[4]], [0, param_1d[3], param_1d[5]], [0, 0, 1]])
     rvecs = param_1d[6:6+3*n].reshape(-1, 3)
@@ -167,6 +217,20 @@ def __transform_parameters(param_1d, n):
     return mtx, dist, rvecs, tvecs
 
 def __compute(objpoints, imgpoints, param_1d, J_func, res_func):
+    """
+    compute jacobian and residual from sympy functions
+
+    Args:
+        objpoints (np.array): 3d points
+        imgpoints (np.array): 2d points obtained from a image.
+        param_1d (np.array): 1d array of parameters
+        J_func: sympy lambdified function for jacobian
+        res_func: sympy lambdified function for residual
+
+    Returns:
+        jacobian(np.array): jacobian matrix
+        residual(np.array) residual matrix
+    """
     N = len(objpoints)
     M = len(objpoints[0])
     jacobian = np.zeros(shape=[N*M, 6+6*N])
@@ -191,6 +255,21 @@ def __compute(objpoints, imgpoints, param_1d, J_func, res_func):
     return jacobian, residual
 
 def calibration(objpoints:np.array, imgpoints:np.array, niter=20):
+    """
+    calibrate camera intrinsic and extrinsic with radial distortion.
+
+    Args:
+        objpoints (np.array): 3d points
+        imgpoints (np.array): 2d points obtained from a image.
+        niter (int, optional): the number of steps for non-linear optimization. Defaults to 20.
+
+    Returns:
+        mtx: 3x3 camera matrix
+        dist: 5x1 distortion coefficient 
+        rvecs: rotation vectors 
+        tvecs: translation vectors
+        param_history: list of parameters during optimization for later tests.
+    """
     # Set up jacobian and residual
 
     print("Defining sympy symbols")
