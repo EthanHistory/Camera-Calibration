@@ -324,7 +324,7 @@ def calibration(objpoints:np.array, imgpoints:np.array, niter=20):
         update = la.lstsq(jacobian, residual)[0]
         param_1d -= update.flatten()
         param_history.append(__transform_parameters(param_1d, N))
-        print(f"[iter {iter}] residual: {np.sum(np.sqrt(residual))})")
+        print(f"[iter {iter}] residual: {np.sum(np.sqrt(residual))}")
     
     _, residual = __compute(objpoints, imgpoints, param_1d, J_func, res_func)
     print(f"Final residual: {np.sum(np.sqrt(residual))})")
